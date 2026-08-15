@@ -1,0 +1,125 @@
+
+ FinGraph - Neo4j Graph Analytics Queries
+
+
+ 1. Connection Test
+   RETURN "FinGraph Neo4j Connected" AS status;
+
+
+ 2. Create a sample Account node
+    CREATE (a:Account {
+    account_id: "A501"
+})
+RETURN a;
+
+
+3. View all Account nodes
+  MATCH (a:Account)
+  RETURN a;
+
+
+ 4. Preview imported CSV data
+    LOAD CSV WITH HEADERS FROM 'file:///FinGraph_transactions.csv' AS row
+    RETURN row
+    LIMIT 5;
+
+
+ 5. Import transactions into Neo4j
+    LOAD CSV WITH HEADERS FROM 'file:///FinGraph_transactions.csv' AS row
+
+    MERGE (sender:Account {account_id: row.sender_account})
+   MERGE (receiver:Account {account_id: row.receiver_account})
+
+  CREATE (sender)-[:SENT {
+    transaction_id: row.transaction_id,
+    amount: toFloat(row.amount),
+    timestamp: row.timestamp,
+    sender_ip: row.sender_ip
+  }]->(receiver)
+
+  RETURN count(*) AS transactions_created;
+
+
+ 6. View transaction graph
+   MATCH (a:Account)-[t:SENT]->(b:Account)
+   RETURN a, t, b
+   LIMIT 50;
+
+ 7. Detect Starburst pattern
+   MATCH (sender:Account)-[t:SENT]->(receiver:Account)
+   WHERE receiver.account_id = "SHELL01"
+
+   RETURN sender, t, receiver;
+
+
+8. Starburst Risk Analysis
+   MATCH (sender:Account)-[t:SENT]->(receiver:Account)
+   WHERE receiver.account_id = "SHELL01"
+
+   WITH receiver,
+     count(DISTINCT sender) AS unique_senders,
+     sum(t.amount) AS total_amount,
+     avg(t.amount) AS average_transaction
+
+   RETURN
+    receiver.account_id AS receiver_account,
+    "STARBURST" AS pattern,
+    unique_senders,
+    total_amount,
+    round(average_transaction, 2) AS average_transaction,
+    CASE
+        WHEN unique_senders >= 50 THEN 100
+        WHEN unique_senders >= 20 THEN 80
+        WHEN unique_senders >= 10 THEN 60
+        ELSE 30
+    END AS risk_score;
+
+
+9. Smurfing Risk Analysis
+   MATCH (sender:Account)-[t:SENT]->(receiver:Account)
+   WHERE receiver.account_id = "TARGET01"
+
+   WITH receiver,
+     count(DISTINCT sender) AS unique_senders,
+     sum(t.amount) AS total_amount,
+     avg(t.amount) AS average_transaction
+
+   RETURN
+    receiver.account_id AS receiver_account,
+    "SMURFING" AS pattern,
+    unique_senders,
+    total_amount,
+    round(average_transaction, 2) AS average_transaction,
+    CASE
+        WHEN unique_senders >= 20
+             AND average_transaction >= 9000
+             AND average_transaction < 10000
+        THEN 100
+        WHEN unique_senders >= 10
+        THEN 70
+        ELSE 30
+    END AS risk_score;
+
+
+10. Fan-out Detection
+    MATCH (sender:Account)-[t:SENT]->(receiver:Account)
+
+    WITH sender,
+     count(DISTINCT receiver) AS unique_receivers,
+     sum(t.amount) AS total_amount,
+     avg(t.amount) AS average_transaction
+ 
+  WHERE unique_receivers >= 10
+
+  RETURN
+    sender.account_id AS sender_account,
+    "FAN_OUT" AS pattern,
+    unique_receivers,
+    total_amount,
+    round(average_transaction, 2) AS average_transaction,
+    CASE
+        WHEN unique_receivers >= 15 THEN 100
+        WHEN unique_receivers >= 10 THEN 80
+        ELSE 50
+    END AS risk_score
+ORDER BY risk_score DESC;
