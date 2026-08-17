@@ -123,3 +123,50 @@ RETURN a;
         ELSE 50
     END AS risk_score
 ORDER BY risk_score DESC;
+
+
+ ==========================================
+ Neo4j GDS Analytics
+ ==========================================
+
+ PageRank
+CALL gds.pageRank.stream('finGraph')
+YIELD nodeId, score
+RETURN
+    gds.util.asNode(nodeId).account_id AS account,
+    round(score, 4) AS pageRank_score
+ORDER BY score DESC
+LIMIT 15;
+
+
+ Weakly Connected Components (WCC)
+CALL gds.wcc.stream('finGraph')
+YIELD nodeId, componentId
+RETURN
+    gds.util.asNode(nodeId).account_id AS account,
+    componentId
+ORDER BY componentId, account;
+
+
+ Write PageRank to Account nodes
+CALL gds.pageRank.write('finGraph', {
+    writeProperty: 'pageRank'
+})
+YIELD nodePropertiesWritten, ranIterations;
+
+
+ Write WCC to Account nodes
+CALL gds.wcc.write('finGraph', {
+    writeProperty: 'wccComponent'
+})
+YIELD nodePropertiesWritten, componentCount;
+
+
+ View PageRank + WCC
+MATCH (a:Account)
+RETURN
+    a.account_id AS account,
+    round(a.pageRank, 4) AS pageRank,
+    a.wccComponent AS wccComponent
+ORDER BY pageRank DESC
+LIMIT 15;
