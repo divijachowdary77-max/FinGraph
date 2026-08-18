@@ -170,3 +170,20 @@ RETURN
     a.wccComponent AS wccComponent
 ORDER BY pageRank DESC
 LIMIT 15;
+
+ ==========================================
+ Circular Transaction Detection
+ ==========================================
+
+MATCH (a:Account)-[:SENT]->(b:Account)-[:SENT]->(c:Account)-[:SENT]->(a)
+WHERE a <> b
+  AND b <> c
+  AND c <> a
+
+RETURN
+    a.account_id AS account_A,
+    b.account_id AS account_B,
+    c.account_id AS account_C,
+    "CIRCULAR" AS pattern,
+    100 AS risk_score,
+    "HIGH RISK" AS status;
